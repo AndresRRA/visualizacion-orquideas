@@ -70,17 +70,54 @@ orquideas <-
 asp <-
   asp %>%
   dplyr::filter(!is.na(descripcio) & 
-                  descripcio != "Area Marina de Manejo")
-asp <-
-  asp %>%
-  dplyr::filter(!is.na(descripcio) & 
-                  descripcio != "Area marina protegida")
+                  descripcio != "Area Marina de Manejo" & 
+                  descripcio != "Area marina protegida"
+                )
 
 # Mapa
 ## Registros ASP
 asp_registros <-
   asp %>%
+  st_make_valid() %>%
   st_join(orquideas) %>%
-  group_by(asp.x) %>%
-  summarize(registros = n_distinct(gbifID, na.rm = TRUE)) %>%
-  rename(asp = asp.x)
+  group_by(nombre_asp) %>%
+  summarize(species = n())
+
+st_crs(asp_registros) = 4326
+
+## Paleta de colores
+paleta_species <- colorNumeric(palette = "GnBu",
+                               domain = asp_registros$species,
+                               na.color = "transparent")
+
+## Leaflet
+leaflet() %>%
+  setView(lng = -84.0, lat = 10.0, zoom = 7) %>%
+  addProviderTiles(providers$CartoDB.DarkMatter, 
+                   group = "CartoDB.DarkMatter") %>%
+  addPolygons(
+    data = asp_registros,
+    fillColor = ~ paleta_species (asp_registros$species),
+    fillOpacity = 0.7,
+    stroke = TRUE,
+    color = "black",
+    weight = 1,
+    popup = paste(
+      paste(
+        "<strong>ASP:</strong>",
+        asp_registros$nombre_asp),
+      paste(
+        "<strong>Cantidad de especies:</strong>",
+        asp_registros$species),
+      sep = '<br/>'),
+    group = "ASP y especies") %>%
+  addLayersControl(baseGroups = c("OpenStreetMap"),
+                   overlayGroups = c("ASP y especies")) %>%
+  addLegend(
+    position = "bottomright",
+    pal = paleta_species,
+    values = asp_registros$species,
+    group = "ASP y especies",
+    title = "Número de <br>
+    especies<br>
+    de orquídeas")
